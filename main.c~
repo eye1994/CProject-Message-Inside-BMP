@@ -1,0 +1,86 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
+#include <string.h>
+
+typedef uint8_t BYTE;
+
+int main(int argc, char **argv)
+{
+  
+  if (argc != 4)
+  {
+    printf("Wrong arguments: expected -> ./main SOURCE_FILE TARGET_FILE MODE(hide or show)\n");
+    return 1;
+  }
+
+  FILE *inFILE = fopen(argv[1], "rb");
+  FILE *outFILE = fopen(argv[2], "wb");
+  
+  if (!inFILE || !outFILE)
+  {
+    fprintf(stderr, "Error at opening the file\n");
+    return 1;   
+  }
+
+  // GET SECRET MESSAGE
+  char message[100];
+  printf("Enter the meesage you want to hide: ");
+  scanf("%s", message);
+  
+  // SKIP THE JPG HEADER
+  BYTE head[16];
+  fread(&head, sizeof(BYTE), 16, inFILE);
+  fwrite(&head, sizeof(BYTE), 16, outFILE);
+  // thumbnail height and width needed to compute the size of thumbnail data
+  BYTE tw, th; 
+  
+  fread(&tw, sizeof(BYTE), 1, inFILE);
+  fread(&th, sizeof(BYTE), 1, inFILE);
+
+  fwrite(&tw, sizeof(BYTE), 1, outFILE);
+  fwrite(&th, sizeof(BYTE), 1, outFILE);
+  
+  unsigned thumb_size = 3 * (unsigned)tw * (unsigned)th;
+  BYTE thumb_data[thumb_size];
+  fread(&thumb_data, sizeof(thumb_data), 1, inFILE);
+  fwrite(&thumb_data, sizeof(thumb_data), 1, outFILE);
+
+  // WRITE THE MESSAGE TO THE JPG FILE
+  for (unsigned i = 0; i < 10; ++i)
+  {
+    // GO AND FETCH THE BITS
+    BYTE c = message[i];
+    BYTE jpg_byte;
+    fread(&jpg_byte, sizeof(BYTE), 1, inFILE);
+    for (unsigned i = 0, char_len = sizeof(char) * 8; i < char_len; ++i)
+    {
+      BYTE mask = ~(~0u << 1) << i;
+      BYTE char_bit = c & mask; 
+      // IF char_bit is 1 make the less significant bite from jpg to 1
+      if (char_bit)
+        jpg_byte = jpg_byte | ~(~0u << 1);
+      // else force to 0
+      else 
+        jpg_byte = jpg_byte & (~0u << 1);
+      // WRITE BACK TO FILE THE MODIFIED BYTE
+      fwrite(&jpg_byte, sizeof(BYTE), 1, outFILE);
+    }
+  }
+
+  // READ AND WRITE THE REST OF THE FILE
+  while(1)
+  {
+    BYTE pixel;
+    fread(&pixel, sizeof(BYTE), 1, inFILE);
+    if (feof(inFILE))
+      break;
+    fwrite(&pixel, sizeof(BYTE), 1, outFILE);
+  }
+  
+
+  fclose(inFILE);
+  fclose(outFILE);
+
+  return 0;
+}
