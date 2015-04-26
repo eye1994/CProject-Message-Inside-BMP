@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <limits.h>
+#include <ctype.h>
 #include "bmp.h"
 
 #define BLOCK 70
@@ -33,13 +34,12 @@ char * get_line(void) {
 
 void write_byte(FILE *inFILE, FILE *outFILE, BYTE byte)
 {
-  printf("\n%u\n", byte);
   for (unsigned i = 0; i < 8; i++)
   {
     RGBTRIPLE pixel;
     fread(&pixel, sizeof(RGBTRIPLE), 1, inFILE);
     BYTE mask = ~(~0u << 1) << i;
-    BYTE bit = byte & mask; // bit value from the i position in size
+    BYTE bit = byte & mask; // bit value from the i position in byte
     // If bit is 1 make the less significant bite from jpg to 1
     if (bit)
       pixel.rgbtBlue = pixel.rgbtBlue | ~(~0u << 1);
@@ -59,13 +59,18 @@ BYTE read_byte(FILE *inFILE)
     RGBTRIPLE pixel;
     fread(&pixel, sizeof(RGBTRIPLE), 1, inFILE);
     BYTE bit = ~(~0u << 1) & pixel.rgbtBlue;
-    // RECONSTRUCT NUMBER
+    // RECONSTRUCT BYTE
     if (bit)
       byte = byte | (~(~0u << 1) << i);
     else
       byte = byte & ~(~(~0u << 1) << i);
   }
   return byte;
+}
+
+void encrypt(char *string, unsigned len, char *password, unsigned password_len)
+{
+  
 }
 
 void write_message(FILE *inFILE, FILE *outFILE)
@@ -77,13 +82,27 @@ void write_message(FILE *inFILE, FILE *outFILE)
   fgets(message, 253, stdin);
   unsigned len = strlen(message);
 
+  // GET PASSWORD AND ECRYPE
+  BYTE key;
+  unsigned number;
+  printf("Enter the key: (number between 0 - 255): ");
+  scanf("%u", &number);
+  key = number;
+  for (unsigned i = 0, len = strlen(message); i < len; i++)
+  {
+
+    message[i] = (message[i] ^ key);
+  }
+
+  printf("%s\n", message);
+
   // PROCESS THE BMP HEADER
   BITMAPINFOHEADER bi;
   BITMAPFILEHEADER bf;
-  // read infile's BITMAPFILEHEADER
+  // read BITMAPFILEHEADER
   fread(&bf, sizeof(BITMAPFILEHEADER), 1, inFILE);
   fwrite(&bf, sizeof(BITMAPFILEHEADER), 1, outFILE);
-  // read infile's BITMAPINFOHEADER
+  // read BITMAPINFOHEADER
   fread(&bi, sizeof(BITMAPINFOHEADER), 1, inFILE);
   fwrite(&bi, sizeof(BITMAPINFOHEADER), 1, outFILE);
 
@@ -113,16 +132,29 @@ void read_message(FILE *inFILE)
   // PROCESS THE BMP HEADER
   BITMAPINFOHEADER bi;
   BITMAPFILEHEADER bf;
-  // read infile's BITMAPFILEHEADER
+  // read BITMAPFILEHEADER
   fread(&bf, sizeof(BITMAPFILEHEADER), 1, inFILE);
-  // read infile's BITMAPINFOHEADER
+  // read BITMAPINFOHEADER
   fread(&bi, sizeof(BITMAPINFOHEADER), 1, inFILE);
     
   // Get the lenght of the message
   BYTE len = read_byte(inFILE);
+  char message[len + 1];
   // Read the message from the file and print it
-  for (unsigned i = 0; i < len; i++)
-    printf("%c", read_byte(inFILE));
+  unsigned i = 0;
+  for (i = 0; i < len; i++)
+    message[i] = read_byte(inFILE);
+  message[i] = '\0';
+  
+  //GET PASSWORD AND ECRYPT
+  BYTE key;
+  unsigned number;
+  printf("Enter the key: ");
+  scanf("%u", &number);
+  key = number;
+  for (unsigned i = 0, len = strlen(message); i < len; i++)
+    message[i] = (message[i] ^ key);
+
 }
 
 int main(int argc, char **argv)
