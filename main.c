@@ -154,6 +154,7 @@ void read_message(FILE *inFILE)
   key = number;
   for (unsigned i = 0, len = strlen(message); i < len; i++)
     message[i] = (message[i] ^ key);
+  printf("The message is: %s\n", message);
 
 }
 
