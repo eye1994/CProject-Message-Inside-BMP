@@ -8,6 +8,44 @@
 
 #define BLOCK 70
 
+// Get the bit value from the give position in a BYTE
+unsigned getBitValue(unsigned position, BYTE byte)
+{	
+	return byte & ~(~0u << 1) << position;
+}
+
+void setLastBitToOne(BYTE *byte)
+{
+	*byte = *byte | ~(~0u << 1);
+}
+
+void setLastBitToZero(BYTE *byte)
+{
+	*byte = *byte & (~0u << 1);
+}
+
+void setBitToOne(unsigned position, BYTE *byte)
+{
+	*byte = *byte | (~(~0u << 1) << position);
+}
+
+void setBitToZero(unsigned position, BYTE *byte)
+{
+	*byte = *byte & ~(~(~0u << 1) << position);
+}
+
+RGBTRIPLE readPixel(FILE *inFILE)
+{
+	RGBTRIPLE pixel;
+  fread(&pixel, sizeof(RGBTRIPLE), 1, inFILE);
+	return pixel;
+} 
+
+void writePixel(RGBTRIPLE pixel, FILE *outFILE)
+{
+	fwrite(&pixel, sizeof(pixel), 1, outFILE);
+}
+
 char * get_line(void) {
   char * tmp, * line = NULL;
   int mem = -1, size = 0;
@@ -36,18 +74,14 @@ void write_byte(FILE *inFILE, FILE *outFILE, BYTE byte)
 {
   for (unsigned i = 0; i < 8; i++)
   {
-    RGBTRIPLE pixel;
-    fread(&pixel, sizeof(RGBTRIPLE), 1, inFILE);
-    BYTE mask = ~(~0u << 1) << i;
-    BYTE bit = byte & mask; // bit value from the i position in byte
-    // If bit is 1 make the less significant bite from jpg to 1
-    if (bit)
-      pixel.rgbtBlue = pixel.rgbtBlue | ~(~0u << 1);
-    // else force to 0
+    RGBTRIPLE pixel = readPixel(inFILE);
+		unsigned bit_value = getBitValue(i, byte);
+    if (bit_value)
+			setLastBitToOne(&pixel.rgbtBlue);
     else 
-      pixel.rgbtBlue = pixel.rgbtBlue & (~0u << 1);
-    // WRITE BACK TO FILE THE MODIFIED BYTE
-    fwrite(&pixel, sizeof(pixel), 1, outFILE); 
+      setLastBitToZero(&pixel.rgbtBlue);
+		writePixel(pixel, outFILE);
+    //fwrite(&pixel, sizeof(pixel), 1, outFILE); 
    } 
 }
 
@@ -56,14 +90,12 @@ BYTE read_byte(FILE *inFILE)
   BYTE byte = 0u;
   for (unsigned i = 0; i < 8; i++)
   { 
-    RGBTRIPLE pixel;
-    fread(&pixel, sizeof(RGBTRIPLE), 1, inFILE);
-    BYTE bit = ~(~0u << 1) & pixel.rgbtBlue;
-    // RECONSTRUCT BYTE
-    if (bit)
-      byte = byte | (~(~0u << 1) << i);
+    RGBTRIPLE pixel = readPixel(inFILE);
+		unsigned bit_value = getBitValue(0, pixel.rgbtBlue);
+    if (bit_value)
+      setBitToOne(i, &byte);
     else
-      byte = byte & ~(~(~0u << 1) << i);
+      setBitToZero(i, &byte);
   }
   return byte;
 }
