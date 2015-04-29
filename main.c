@@ -100,36 +100,34 @@ BYTE read_byte(FILE *inFILE)
   return byte;
 }
 
-void encrypt(char *string, unsigned len, char *password, unsigned password_len)
+void encrypt(char *string, BYTE key)
 {
-  
+  for (unsigned i = 0; string[i]; i++)
+		string[i] = string[i] ^ key;
 }
 
-void write_message(FILE *inFILE, FILE *outFILE)
+char *getMessage()
 {
-  // GET SECRET MESSAGE
-  printf("Enter the message you want to hide: ");
-  char message[254];
-  get_line(); // consume '\n'
+	printf("Enter the message you want to hide: ");
+  char *message = malloc(sizeof(char) * 254);  
+	if (!message) exit(1);	
+	get_line(); // consume '\n'
   fgets(message, 253, stdin);
-  unsigned len = strlen(message);
+	return message;
+}
 
-  // GET PASSWORD AND ECRYPE
-  BYTE key;
-  unsigned number;
+BYTE getPassword()
+{
   printf("Enter the key: (number between 0 - 255): ");
-  scanf("%u", &number);
-  key = number;
-  for (unsigned i = 0, len = strlen(message); i < len; i++)
-  {
+ 	unsigned password;
+	scanf("%u", &password);
+	if (!password) exit(1);
+	return (BYTE)password;
+}
 
-    message[i] = (message[i] ^ key);
-  }
-
-  printf("%s\n", message);
-
-  // PROCESS THE BMP HEADER
-  BITMAPINFOHEADER bi;
+void writeHeader(FILE *inFILE, FILE *outFILE)
+{
+	BITMAPINFOHEADER bi;
   BITMAPFILEHEADER bf;
   // read BITMAPFILEHEADER
   fread(&bf, sizeof(BITMAPFILEHEADER), 1, inFILE);
@@ -137,109 +135,123 @@ void write_message(FILE *inFILE, FILE *outFILE)
   // read BITMAPINFOHEADER
   fread(&bi, sizeof(BITMAPINFOHEADER), 1, inFILE);
   fwrite(&bi, sizeof(BITMAPINFOHEADER), 1, outFILE);
-
-  BYTE string_size = len - 1;
-
-  // Write the lenght of the message intro the image
-  write_byte(inFILE, outFILE, string_size);
-  // Write char by char in the image
-  for (unsigned i = 0; i < string_size; i++)
-  {
-    BYTE character = message[i];
-    write_byte(inFILE, outFILE, character);
-  }
-  // Copy remainging file
-  while(1)
-  {
-    BYTE buffer;
-    fread(&buffer, sizeof(BYTE), 1, inFILE);
-    if (feof(inFILE))
-      break;
-    fwrite(&buffer, sizeof(BYTE), 1, outFILE);
-  }
 }
 
-void read_message(FILE *inFILE)
+void skipHeader(FILE *inFILE)
 {
-  // PROCESS THE BMP HEADER
-  BITMAPINFOHEADER bi;
+	BITMAPINFOHEADER bi;
   BITMAPFILEHEADER bf;
   // read BITMAPFILEHEADER
   fread(&bf, sizeof(BITMAPFILEHEADER), 1, inFILE);
   // read BITMAPINFOHEADER
   fread(&bi, sizeof(BITMAPINFOHEADER), 1, inFILE);
-    
+}
+
+
+void writeMessageToFile(FILE *inFILE, FILE *outFILE)
+{
+  char *message = getMessage();
+	unsigned len = strlen(message);	
+
+  //char *key = getPassword();
+  //encrypt(message, key);
+
+	writeHeader(inFILE, outFILE);
+  
+	BYTE string_len = len - 1;
+  write_byte(inFILE, outFILE, string_len);
+
+  // Write char by char in the image
+  for (unsigned i = 0; i < string_len; i++)
+    write_byte(inFILE, outFILE, message[i]);
+
+  // Copy remainging file
+  while(!feof(inFILE))
+  {
+    RGBTRIPLE pixel = readPixel(inFILE);
+    writePixel(pixel, outFILE);
+  }
+}
+
+void readMessageFromFile(FILE *inFILE)
+{
+	skipHeader(inFILE);
   // Get the lenght of the message
   BYTE len = read_byte(inFILE);
   char message[len + 1];
+
   // Read the message from the file and print it
   unsigned i = 0;
   for (i = 0; i < len; i++)
     message[i] = read_byte(inFILE);
   message[i] = '\0';
   
-  //GET PASSWORD AND ECRYPT
-  BYTE key;
-  unsigned number;
-  printf("Enter the key: ");
-  scanf("%u", &number);
-  key = number;
-  for (unsigned i = 0, len = strlen(message); i < len; i++)
-    message[i] = (message[i] ^ key);
+  BYTE key = getPassword();
+  encrypt(message, key);
   printf("The message is: %s\n", message);
 
 }
 
+FILE *getTargetFile()
+{
+	char fileName[100];
+  printf("Enter the name of the input file: ");
+  scanf("%99s", fileName);
+	FILE *file = fopen(fileName, "rb");
+	if (!file) exit(1);
+	return file;
+}
+
+FILE *getDestinationFile()
+{
+	char fileName[100];
+  printf("Enter the name of the output file: ");
+  scanf("%99s", fileName);
+	FILE *file = fopen(fileName, "wb");
+	if (!file) exit(1);
+	return file;
+}
+
+void printMenu()
+{
+	printf("MENU: \n1. Write message.\n2. Read Message\nYour option: ");
+}
+
+unsigned getMode()
+{
+	unsigned mode;
+  if (scanf("%u", &mode) != 1)
+  	exit(1);
+	return mode;
+}
+
+void hideMessage()
+{
+	FILE *inFILE = getTargetFile();
+	FILE *outFILE = getDestinationFile();
+	writeMessageToFile(inFILE, outFILE);  
+	fclose(inFILE);
+	fclose(outFILE);
+}
+
+void getHiddenMessage()
+{
+	FILE *inFILE = getTargetFile();
+	readMessageFromFile(inFILE);  
+	fclose(inFILE);
+}
+
 int main(int argc, char **argv)
 {
-  // Print menu
-  printf("MENU: \n1. Write message.\n2. Read Message\nYour option: ");
-  unsigned mode;
-  
-  // READ THE MODE FROM USER
-  if (scanf("%u", &mode) != 1)
-    return 1;
-  
-  if (mode == 1)
-  {
-    char inFileName[100], outFileName[100];
-    printf("Enter the name of the input file: ");
-    scanf("%99s", inFileName);
-    
-    printf("Enter the name of the output file: ");
-    scanf("%99s", outFileName);
-    
-    FILE *inFILE = fopen(inFileName, "rb");
-    FILE *outFILE = fopen(outFileName, "wb");  
-    
-    if (!inFILE || !outFILE)
-    {
-      fprintf(stderr, "Error at opening the file\n");
-      return 1;   
-    }
-    write_message(inFILE, outFILE);  
-    fclose(inFILE);
-    fclose(outFILE);
-  }
-  else if (mode == 2)
-  {
-    char inFileName[100];
-    printf("Enter the name of the input file: ");
-    scanf("%99s", inFileName);
-    FILE *inFILE = fopen(inFileName, "rb");
-    if (!inFILE)
-    {
-      fprintf(stderr, "Error at opening the file\n");
-      return 1;   
-    }
-    read_message(inFILE);  
-    fclose(inFILE);
-  }
-  else
-  {
-    printf("Wrong mode.\n");
-    return 1;
-  }
+  printMenu();
+	unsigned mode = getMode();
+
+	if (mode == 1)
+		hideMessage();
+	else if (mode == 2)
+		getHiddenMessage();
+	else 
+		printf("Wrong mode.\n");
 
   return 0;
 }
