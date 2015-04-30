@@ -153,8 +153,8 @@ void writeMessageToFile(FILE *inFILE, FILE *outFILE)
   char *message = getMessage();
 	unsigned len = strlen(message);	
 
-  //char *key = getPassword();
-  //encrypt(message, key);
+  BYTE key = getPassword();
+  encrypt(message, key);
 
 	writeHeader(inFILE, outFILE);
   
